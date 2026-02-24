@@ -1,21 +1,23 @@
 import logging
-from typing import NamedTuple
+from datetime import datetime
 
 from langchain_ollama import OllamaEmbeddings
+from pydantic import BaseModel, Field
 
 from parser import NormalisedData
 
 
 class Embedder:
-    class HostPreEmbedding(NamedTuple):
+    class HostPreEmbedding(BaseModel):
         os: str
         port_set: str
         services: str
 
-    class HostEmbedding(NamedTuple):
+    class HostEmbedding(BaseModel):
         os: list[float]
         port_set: list[float]
         services: list[float]
+        generated_at: datetime = Field(default_factory=datetime.now)
 
     def __init__(self, model_name: str):
         self.model = OllamaEmbeddings(model=model_name)
@@ -30,7 +32,9 @@ class Embedder:
         ports_embedding = self.model.embed_query(data.port_set)
         services_embedding = self.model.embed_query(data.services)
 
-        return self.HostEmbedding(os_embedding, ports_embedding, services_embedding)
+        return self.HostEmbedding(
+            os=os_embedding, port_set=ports_embedding, services=services_embedding
+        )
 
     def _format_service_preembedding(self, port: int, service: str) -> str:
         service_split = service.split("-")
@@ -52,7 +56,7 @@ class Embedder:
             services += self._format_service_preembedding(port, service)
 
         return self.HostPreEmbedding(
-            os,
-            open_ports,
-            services,
+            os=os,
+            port_set=open_ports,
+            services=services,
         )

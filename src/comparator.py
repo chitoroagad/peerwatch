@@ -4,9 +4,10 @@ import os
 from datetime import datetime
 from os import PathLike
 from pathlib import Path
-from typing import Iterator, NamedTuple
+from typing import Iterator
 
 from langchain_community.utils.math import cosine_similarity
+from pydantic import BaseModel
 from sortedcontainers import SortedDict
 
 from embedder import Embedder
@@ -14,10 +15,21 @@ from parser import NmapParser, NormalisedData
 
 
 class Comparator:
-    class Similarities(NamedTuple):
+    class Similarities(BaseModel):
         os: float
         ports: float
         services: float
+
+    class HostFingerprint:
+        def __init__(
+            self,
+            mac_address: str | None,
+            ipv4_address: str | None,
+            ipv6_address: str | None,
+        ):
+            self.mac_address = mac_address
+            self.ipv4_address = ipv4_address
+            self.ipv6_address = ipv6_address
 
     def __init__(self, embedder: Embedder, data_path: str | PathLike):
         self.embedder = embedder
