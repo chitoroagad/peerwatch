@@ -12,7 +12,7 @@
     # };
   };
 
-  outputs = inputs @ {
+  outputs = {
     nixpkgs,
     flake-utils,
     ...

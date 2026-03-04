@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+from peer_store import PeerStore
 import glob
 import json
 import logging
@@ -118,13 +119,18 @@ if __name__ == "__main__":
     #     with open(file) as f:
     #         jsonify(f)
     files = glob.glob("./data/*.json")
+    peer_store = PeerStore()
+    embedder = Embedder("all-minilm:22m")
+    # comparator = Comparator(embedder, "./data/")
     for file in files:
         with open(file) as f:
             data = json.load(f)
             for host in data:
                 parser = NmapParser(host)
                 normalised_data = parser.parse()
-                embedder = Embedder("all-minilm:22m")
-                comparator = Comparator(embedder, "./data/")
+                embeddings = embedder.embed(normalised_data)
+                if embeddings is not None:
+                    peer_store.add_or_update_peer(normalised_data, embeddings)
+                    print("added host to peer store")
+
                 # pprint(embeddings)
-                print("\n=========================\n")

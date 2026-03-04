@@ -1,20 +1,22 @@
 import logging
+from datetime import datetime
 from ipaddress import IPv4Address, IPv6Address, ip_address
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from pydantic import BaseModel, Field
 
 
 class NormalisedData(BaseModel):
-    mac_address: str = Field(default="unkown")
-    ipv4: str = Field(default="unkown")
-    ipv6: str = Field(default="unkown")
-    os: str = Field(default="unkown")
-    os_version: str = Field(default="unkown")
-    distribution: str = Field(default="unkown")
-    device_vendor: str = Field(default="unkown")
+    mac_address: str = Field(default="unknown")
+    ipv4: str = Field(default="unknown")
+    ipv6: str = Field(default="unknown")
+    os: str = Field(default="unknown")
+    os_version: str = Field(default="unknown")
+    distribution: str = Field(default="unknown")
+    device_vendor: str = Field(default="unknown")
     open_ports: list[int] = Field(default=[])
     services: dict[int, str] = Field(default={})
+    generated_at: datetime = Field(default_factory=datetime.now)
 
 
 class NmapParser:
@@ -28,10 +30,10 @@ class NmapParser:
         open_port: bool
 
     class VendorAddresses(NamedTuple):
-        vendor: Optional[str]
-        mac: Optional[str]
-        ipv4: Optional[IPv4Address]
-        ipv6: Optional[IPv6Address]
+        vendor: str | None
+        mac: str | None
+        ipv4: IPv4Address | None
+        ipv6: IPv6Address | None
 
     def __init__(self, host_data: dict):
         self.raw_data = host_data
@@ -95,7 +97,7 @@ class NmapParser:
         self.normalised_data["ipv4"] = str(ipv4) if ipv4 else None
         self.normalised_data["ipv6"] = str(ipv6) if ipv6 else None
 
-    def _find_device_vendor_and_address(self, address) -> Optional[VendorAddresses]:
+    def _find_device_vendor_and_address(self, address) -> VendorAddresses | None:
         address_iter = address if isinstance(address, list) else [address]
         vendor = None
         mac = None
@@ -116,7 +118,7 @@ class NmapParser:
             logging.warning(f"No valid MAC address found for {address_iter}")
         return self.VendorAddresses(vendor, mac, ipv4, ipv6)
 
-    def _check_address_and_vendor(self, addr: dict) -> Optional[VendorAddresses]:
+    def _check_address_and_vendor(self, addr: dict) -> VendorAddresses | None:
         addrtype = addr.get("@addrtype")
         if not addrtype:
             logging.warning(f"No '@addrtype' in address: {addr}")

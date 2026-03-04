@@ -7,22 +7,24 @@ from pydantic import BaseModel, Field
 from parser import NormalisedData
 
 
+class PeerPreEmbeddings(BaseModel):
+    os: str
+    port_set: str
+    services: str
+
+
+class PeerEmbeddings(BaseModel):
+    os: list[float]  # very stable
+    port_set: list[float]  # semi-stable
+    services: list[float]  # volatile
+    generated_at: datetime = Field(default_factory=datetime.now)
+
+
 class Embedder:
-    class HostPreEmbedding(BaseModel):
-        os: str
-        port_set: str
-        services: str
-
-    class HostEmbedding(BaseModel):
-        os: list[float]
-        port_set: list[float]
-        services: list[float]
-        generated_at: datetime = Field(default_factory=datetime.now)
-
     def __init__(self, model_name: str):
         self.model = OllamaEmbeddings(model=model_name)
 
-    def embed(self, normalised_host_data: NormalisedData) -> HostEmbedding | None:
+    def embed(self, normalised_host_data: NormalisedData) -> PeerEmbeddings | None:
         data = self._prep_to_embed(normalised_host_data)
         if data is None:
             logging.warning(f"Could not prep to embed {normalised_host_data}")
@@ -32,7 +34,7 @@ class Embedder:
         ports_embedding = self.model.embed_query(data.port_set)
         services_embedding = self.model.embed_query(data.services)
 
-        return self.HostEmbedding(
+        return PeerEmbeddings(
             os=os_embedding, port_set=ports_embedding, services=services_embedding
         )
 
@@ -55,7 +57,7 @@ class Embedder:
         for port, service in host.services.items():
             services += self._format_service_preembedding(port, service)
 
-        return self.HostPreEmbedding(
+        return PeerPreEmbeddings(
             os=os,
             port_set=open_ports,
             services=services,

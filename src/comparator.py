@@ -10,7 +10,7 @@ from langchain_community.utils.math import cosine_similarity
 from pydantic import BaseModel
 from sortedcontainers import SortedDict
 
-from embedder import Embedder
+from embedder import Embedder, PeerEmbeddings
 from parser import NmapParser, NormalisedData
 
 
@@ -34,7 +34,7 @@ class Comparator:
     def __init__(self, embedder: Embedder, data_path: str | PathLike):
         self.embedder = embedder
         self.data_path = data_path
-        self.peer_store: dict[str, Embedder.HostEmbedding] = {}
+        self.peer_store: dict[str, PeerEmbeddings] = {}
         self.time_to_hosts = self._load_data()
         self._set_time_to_embeddings()
         self._process_embeddings()
@@ -54,7 +54,7 @@ class Comparator:
 
     def _set_time_to_embeddings(self):
         time_to_embeddings_data: dict[
-            datetime, list[tuple[NormalisedData, Embedder.HostEmbedding | None]] | None
+            datetime, list[tuple[NormalisedData, PeerEmbeddings | None]] | None
         ] = {time: None for time in self.time_to_hosts.keys()}
         for time, hosts in self.time_to_hosts.items():
             embeddings = []
@@ -80,9 +80,9 @@ class Comparator:
                     continue
 
                 mac = raw_data.mac_address
-                if mac == "unkown":
+                if mac == "unknown":
                     logging.warning(
-                        f"Unkown mac address for host: {raw_data}\t skipping"
+                        f"Unknown mac address for host: {raw_data}\t skipping"
                     )
                     continue
 
