@@ -1,7 +1,3 @@
-.mamba/
-
-*_logs/
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -155,7 +151,6 @@ activemq-data/
 .env
 .envrc
 .venv
-.direnv
 env/
 venv/
 ENV/
@@ -220,8 +215,12 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# DB dir
-data/
+# direnv
+.direnv/
 
-# training/tuning checkpoints
-checkpoints/
+# various log folders
+*logs/
+*log/
+
+# Data dir
+data/

@@ -10,8 +10,8 @@ from langchain_community.utils.math import cosine_similarity
 from pydantic import BaseModel
 from sortedcontainers import SortedDict
 
-from embedder import Embedder, PeerEmbeddings
-from parser import NmapParser, NormalisedData
+from peerwatch.embedder import Embedder, PeerEmbeddings
+from peerwatch.parser import NmapParser, NormalisedData
 
 
 class Comparator:

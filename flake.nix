@@ -56,6 +56,7 @@
           langchain-community
           xmltodict
           sortedcontainers
+          pytest
 
           pkgs.nmap
         ];

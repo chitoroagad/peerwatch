@@ -4,7 +4,7 @@ from datetime import datetime
 from langchain_ollama import OllamaEmbeddings
 from pydantic import BaseModel, Field
 
-from parser import NormalisedData
+from peerwatch.parser import NormalisedData
 
 
 class PeerPreEmbeddings(BaseModel):

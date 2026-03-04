@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 import numpy as np
 from pydantic import BaseModel, Field
 
-from embedder import PeerEmbeddings
-from parser import NormalisedData
+from peerwatch.embedder import PeerEmbeddings
+from peerwatch.parser import NormalisedData
 
 UNKNOWN_KEY = "unknown"
 OS_SIMILARITY_THRESHOLD = 0.92
@@ -30,7 +30,7 @@ class Peer(BaseModel):
     mac_address: str | None = None
     ips: set[str] = Field(default_factory=set)
 
-    confidence: float = 0.1  # 0..1 identity confidence
+    is_volatile: bool = True  # False if MAC is set
     suspicion_score: float = 0.0  # increases with conflicting observations
 
     metadata: NormalisedData
@@ -50,7 +50,7 @@ class Peer(BaseModel):
 
     def __str__(self) -> str:
         return f"""id: {self.internal_id}, mac: {self.mac_address}, ips: {self.ips}
-        id_confidence: {self.confidence}, suspicion_score: {self.suspicion_score}\n"""
+        is_volatile: {self.is_volatile}, suspicion_score: {self.suspicion_score}\n"""
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -75,11 +75,16 @@ class PeerStore:
         overall_score: float
         events: list[str]
 
-    peers: dict[str, Peer] = dict()
-    mac_to_id: dict[str, str] = dict()
-    ip_to_id: dict[str, str] = dict()
+    peers: dict[str, Peer]
+    mac_to_id: dict[str, str]
+    ip_to_id: dict[str, str]
 
     _lock: threading.Lock = threading.Lock()
+
+    def __init__(self):
+        self.peers = {}
+        self.mac_to_id = {}
+        self.ip_to_id = {}
 
     # --------------------
     # Public API
@@ -125,6 +130,13 @@ class PeerStore:
             peer = self._resolve_conflict(candidate_ids, mac, ips, data, embeddings)
             return peer
 
+    def reset(self):
+        logging.warning("Resetting Peer Store")
+        with self._lock:
+            self.peers = {}
+            self.mac_to_id = {}
+            self.ip_to_id = {}
+
     # --------------------
     # Internal helpers
     # --------------------
@@ -159,12 +171,12 @@ class PeerStore:
         data: NormalisedData,
         embeddings: PeerEmbeddings,
     ) -> Peer:
-        peer = Peer(
+        peer = Peer.model_construct(
             mac_address=mac,
             ips=set(ips),
             metadata=data,
             embeddings=embeddings,
-            confidence=0.7 if mac else 0.3,
+            is_volatile=True if mac else False,
         )
 
         peer.record_event("peer_created", mac=mac, ips=list(ips))
@@ -196,7 +208,7 @@ class PeerStore:
 
         if mac and not peer.mac_address:
             peer.mac_address = mac
-            peer.confidence = min(peer.confidence + 0.3, 1.0)
+            peer.is_volatile = False
             self.mac_to_id[mac] = peer.internal_id
             peer.record_event("mac_promoted", mac=mac)
 
@@ -216,7 +228,9 @@ class PeerStore:
     ) -> Peer:
         # Choose highest confidence peer as survivor
         peers = [self.peers[i] for i in candidate_ids]
-        survivor = max(peers, key=lambda p: p.confidence)
+        survivor = max(peers, key=lambda p: p.is_volatile)
+        print(f"conflicting peers: {peers}")
+        print("Check this as it might be broken")
 
         survivor.suspicion_score += 1
         survivor.record_event(
@@ -308,4 +322,8 @@ class PeerStore:
         return ips
 
     def __str__(self) -> str:
-        return f"PeerStore({len(self.peers)} peers: " + ", ".join(str(p) for p in self.peers.values()) + ")"
+        return (
+            f"PeerStore({len(self.peers)} peers: "
+            + ", ".join(str(p) for p in self.peers.values())
+            + ")"
+        )

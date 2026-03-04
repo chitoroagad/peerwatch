@@ -1,6 +1,8 @@
 - [ ] Create features out of scanned RTTs and ports then compare them across time.
 - [x] Make useful peer store to have baseline of peers to compare new measurements against
 - [x] Make peer store compare incoming peer data
+- [ ] Tune suspicion parameters (how much suspicion is increased by and when)
+- [ ] Add LLM actions
 
 # Further ideas:
 

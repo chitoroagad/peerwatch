@@ -1,6 +1,5 @@
 #! /usr/bin/env python
 
-from peer_store import PeerStore
 import glob
 import json
 import logging
@@ -14,9 +13,7 @@ import xmltodict
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from comparator import Comparator
-from embedder import Embedder
-from parser import NmapParser
+from peerwatch import Comparator, Embedder, NmapParser, PeerStore
 
 UNIMPORTANT_NMAP_FIELDS = [
     "@starttime",
@@ -131,6 +128,6 @@ if __name__ == "__main__":
                 embeddings = embedder.embed(normalised_data)
                 if embeddings is not None:
                     peer_store.add_or_update_peer(normalised_data, embeddings)
-                    print("added host to peer store")
+                    # print("added host to peer store")
 
     print(peer_store)
