@@ -1,15 +1,18 @@
-from pprint import pprint
 import logging
 import threading
 import uuid
 from datetime import datetime, timezone
 
+import numpy as np
 from pydantic import BaseModel, Field
 
 from embedder import PeerEmbeddings
 from parser import NormalisedData
 
 UNKNOWN_KEY = "unknown"
+OS_SIMILARITY_THRESHOLD = 0.92
+PORT_SIMILARITY_THRESHOLD = 0.80
+SERVICE_SIMILARITY_THRESHOLD = 0.75
 
 
 class IdentityEvent(BaseModel):
@@ -45,6 +48,13 @@ class Peer(BaseModel):
             )
         )
 
+    def __str__(self) -> str:
+        return f"""id: {self.internal_id}, mac: {self.mac_address}, ips: {self.ips}
+        id_confidence: {self.confidence}, suspicion_score: {self.suspicion_score}\n"""
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
 
 class PeerStore:
     """
@@ -57,6 +67,13 @@ class PeerStore:
 
     The store preserves historical observations to support forensic analysis.
     """
+
+    class EmbeddingComparison(BaseModel):
+        os_similarity: float
+        port_similarity: float
+        service_similarity: float
+        overall_score: float
+        events: list[str]
 
     peers: dict[str, Peer] = dict()
     mac_to_id: dict[str, str] = dict()
@@ -81,6 +98,9 @@ class PeerStore:
     def add_or_update_peer(
         self, data: NormalisedData, embeddings: PeerEmbeddings
     ) -> Peer:
+        """
+        Checks peer for anomaly then adds/updates store
+        """
         mac = self._normalise_mac(data.mac_address)
         ips = self._extract_ips(data)
 
@@ -96,7 +116,9 @@ class PeerStore:
 
             if len(candidate_ids) == 1:
                 peer = self.peers[next(iter(candidate_ids))]
+                suspicion = self._check_incoming_embeddings(peer, embeddings)
                 self._update_peer(peer, mac, ips, data, embeddings)
+                peer.suspicion_score += suspicion
                 return peer
 
             # Multiple candidates → possible spoofing or identity collision
@@ -106,6 +128,29 @@ class PeerStore:
     # --------------------
     # Internal helpers
     # --------------------
+
+    def _check_incoming_embeddings(
+        self, prev: Peer, incoming_embeddings: PeerEmbeddings
+    ) -> float:
+        comparison = self._compare_peers(prev.embeddings, incoming_embeddings)
+        suspicion = prev.suspicion_score
+        for event in comparison.events:
+            prev.record_event(event)
+        if "full_identity_shift" in comparison.events:
+            suspicion += 2.0
+        # else:
+        #     if "os_fingerprint_changed" in comparison.events:
+        #         suspicion += 1.0
+        #     if "port_fingerprint_changed" in comparison.events:
+        #         suspicion += 0.7
+        #     if "service_fingerprint_changed" in comparison.events:
+        #         suspicion += 0.5
+        elif "os_fingerprint_changed" in comparison.events:
+            suspicion += 1.0
+        elif "overall_score" in comparison.events:
+            suspicion += 0.5
+
+        return suspicion
 
     def _create_peer(
         self,
@@ -148,8 +193,6 @@ class PeerStore:
             peer.suspicion_score += 0.5
             peer.record_event("mac_conflict", old_mac=peer.mac_address, new_mac=mac)
             logging.warning(f"MAC conflict for peer {peer.internal_id}")
-            print("MAC conflict")
-            pprint(peer.identity_history)
 
         if mac and not peer.mac_address:
             peer.mac_address = mac
@@ -209,6 +252,42 @@ class PeerStore:
 
         del self.peers[ghost.internal_id]
 
+    @staticmethod
+    def _compare_peers(
+        prev: PeerEmbeddings, incoming: PeerEmbeddings
+    ) -> PeerStore.EmbeddingComparison:  # noqa: F821
+        os_sim = PeerStore._cosine_similarity(prev.os, incoming.os)
+        port_sim = PeerStore._cosine_similarity(prev.port_set, incoming.port_set)
+        service_sim = PeerStore._cosine_similarity(prev.services, incoming.services)
+
+        events = []
+
+        if os_sim < OS_SIMILARITY_THRESHOLD:
+            events.append("os_fingerprint_changed")
+
+        if port_sim < PORT_SIMILARITY_THRESHOLD:
+            events.append("port_fingerprint_changed")
+
+        if service_sim < SERVICE_SIMILARITY_THRESHOLD:
+            events.append("service_fingerprint_changed")
+
+        overall = 0.5 * os_sim + 0.3 * port_sim + 0.2 * service_sim
+
+        if os_sim < 0.7 and port_sim < 0.7 and service_sim < 0.7:
+            events.append("full_identity_shift")
+
+        return PeerStore.EmbeddingComparison(
+            os_similarity=os_sim,
+            port_similarity=port_sim,
+            service_similarity=service_sim,
+            overall_score=overall,
+            events=events,
+        )
+
+    @staticmethod
+    def _cosine_similarity(a: list[float], b: list[float]) -> float:
+        return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
     # --------------------
     # Normalization helpers
     # --------------------
@@ -227,3 +306,6 @@ class PeerStore:
         if data.ipv6 and data.ipv6 != UNKNOWN_KEY:
             ips.add(data.ipv6)
         return ips
+
+    def __str__(self) -> str:
+        return f"PeerStore({len(self.peers)} peers: " + ", ".join(str(p) for p in self.peers.values()) + ")"

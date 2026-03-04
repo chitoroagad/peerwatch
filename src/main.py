@@ -133,4 +133,4 @@ if __name__ == "__main__":
                     peer_store.add_or_update_peer(normalised_data, embeddings)
                     print("added host to peer store")
 
-                # pprint(embeddings)
+    print(peer_store)

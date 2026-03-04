@@ -1,6 +1,6 @@
 - [ ] Create features out of scanned RTTs and ports then compare them across time.
 - [x] Make useful peer store to have baseline of peers to compare new measurements against
-- [ ] Make peer store compare incoming peer data
+- [x] Make peer store compare incoming peer data
 
 # Further ideas:
 
